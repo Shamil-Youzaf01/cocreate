@@ -2,128 +2,8 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import AppError from "../utils/AppError.js";
-import generateVerificationToken from "../utils/generateVerificationToken.js";
-import hashToken from "../utils/hashToken.js";
 import { generateAccessToken } from "../utils/generateTokens.js";
-import {
-  storeVerificationToken,
-  getUserIdByVerificationToken,
-  deleteVerificationToken,
-  getResendCooldown,
-  setResendCooldown,
-} from "./emailVerification.service.js";
 import { getSession, deleteSession } from "./session.service.js";
-
-const registerUser = async ({ name, email, password, role }) => {
-  const normalizedEmail = email.toLowerCase().trim();
-
-  const existingUser = await User.findOne({
-    email: normalizedEmail,
-  });
-
-  if (existingUser) {
-    throw new AppError("An account with this email already exists", 409);
-  }
-
-  const allowedRoles = ["CREATOR", "BRAND"];
-
-  if (!allowedRoles.includes(role)) {
-    throw new AppError("Invalid user role", 400);
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 12);
-
-  const user = await User.create({
-    name,
-    email: normalizedEmail,
-    password: hashedPassword,
-    role,
-  });
-
-  const { token, tokenHash } = generateVerificationToken();
-
-  await storeVerificationToken({
-    userId: user._id.toString(),
-    tokenHash,
-  });
-
-  return {
-    user,
-    verificationToken: token,
-  };
-};
-
-const verifyEmail = async (token) => {
-  const tokenHash = hashToken(token);
-
-  const userId = await getUserIdByVerificationToken(tokenHash);
-
-  if (!userId) {
-    throw new AppError("Verification link is invalid or has expired", 400);
-  }
-
-  const user = await User.findById(userId);
-
-  if (!user) {
-    await deleteVerificationToken({
-      userId,
-      tokenHash,
-    });
-
-    throw new AppError("User not found", 404);
-  }
-
-  user.emailVerified = true;
-  user.emailVerifiedAt = new Date();
-
-  await user.save();
-
-  await deleteVerificationToken({
-    userId,
-    tokenHash,
-  });
-
-  return user;
-};
-
-const resendVerification = async (email) => {
-  const normalizedEmail = email.toLowerCase().trim();
-
-  const user = await User.findOne({
-    email: normalizedEmail,
-  });
-
-  if (!user) {
-    throw new AppError("User not found", 404);
-  }
-
-  if (user.emailVerified) {
-    throw new AppError("Email is already verified", 400);
-  }
-
-  const cooldown = await getResendCooldown(user._id.toString());
-
-  if (cooldown > 0) {
-    throw new AppError(
-      `Please wait ${cooldown} seconds before requesting another verification email`,
-      429,
-    );
-  }
-
-  const { token, tokenHash } = generateVerificationToken();
-
-  await storeVerificationToken({
-    userId: user._id.toString(),
-    tokenHash,
-  });
-
-  await setResendCooldown(user._id.toString());
-
-  return {
-    user,
-    verificationToken: token,
-  };
-};
 
 const loginUser = async ({ email, password }) => {
   const normalizedEmail = email.toLowerCase().trim();
@@ -207,9 +87,6 @@ const logoutUser = async (refreshToken) => {
 };
 
 export {
-  registerUser,
-  verifyEmail,
-  resendVerification,
   loginUser,
   refreshAccessToken,
   logoutUser,

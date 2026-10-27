@@ -1,3 +1,4 @@
+import { notifyUser, notifyAdmins } from "./notification.service.js";
 import Dispute from "../models/Dispute.js";
 import Campaign from "../models/Campaign.js";
 import Application from "../models/Application.js";
@@ -97,7 +98,7 @@ const createDispute = async ({
     );
   }
 
-  return Dispute.create({
+  const dispute = await Dispute.create({
     raisedBy: userId,
     campaignId,
     applicationId: applicationId || null,
@@ -106,6 +107,8 @@ const createDispute = async ({
     subject,
     description,
   });
+  await notifyAdmins({ eventKey: `dispute:${dispute._id}:created`, type: "DISPUTE", title: "New dispute received", message: "A new dispute is waiting for admin review.", href: "/dashboard/disputes" });
+  return dispute;
 };
 
 const getUserDisputes = async (userId) => {
@@ -155,6 +158,7 @@ const startDisputeReview = async ({ disputeId, adminId }) => {
   dispute.resolvedBy = adminId;
 
   await dispute.save();
+  await notifyUser({ recipientId: dispute.raisedBy, eventKey: `dispute:${dispute._id}:${dispute.status}`, type: "DISPUTE", title: "Dispute status updated", message: `Your dispute is now ${dispute.status.toLowerCase().replaceAll("_", " ")}.`, href: "/dashboard/disputes" });
 
   return dispute;
 };
@@ -184,6 +188,7 @@ const resolveDispute = async ({ disputeId, adminId, decision, resolution }) => {
   dispute.resolvedAt = new Date();
 
   await dispute.save();
+  await notifyUser({ recipientId: dispute.raisedBy, eventKey: `dispute:${dispute._id}:${dispute.status}`, type: "DISPUTE", title: "Dispute status updated", message: `Your dispute is now ${dispute.status.toLowerCase().replaceAll("_", " ")}.`, href: "/dashboard/disputes" });
 
   return dispute;
 };

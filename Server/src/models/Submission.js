@@ -40,6 +40,92 @@ const submissionSchema = new mongoose.Schema(
       default: "SUBMITTED",
     },
 
+    reportedViews: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+
+    verifiedViews: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+
+    calculatedReward: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+
+    finalReward: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+
+    rewardStatus: {
+      type: String,
+      enum: ["NOT_ELIGIBLE", "PENDING_VERIFICATION", "READY", "CREDITED"],
+      default: "PENDING_VERIFICATION",
+    },
+
+    platformTracking: {
+      platform: {
+        type: String,
+        enum: ["YOUTUBE", "INSTAGRAM"],
+        default: null,
+      },
+      externalMediaId: {
+        type: String,
+        trim: true,
+        default: null,
+      },
+      baselineViews: {
+        type: Number,
+        min: 0,
+        default: 0,
+      },
+      currentViews: {
+        type: Number,
+        min: 0,
+        default: 0,
+      },
+      eligibleViews: {
+        type: Number,
+        min: 0,
+        default: 0,
+      },
+      source: {
+        type: String,
+        enum: ["MANUAL", "YOUTUBE_API", "INSTAGRAM_API"],
+        default: "MANUAL",
+      },
+      syncStatus: {
+        type: String,
+        enum: ["NOT_CONNECTED", "ACTIVE", "FAILED"],
+        default: "NOT_CONNECTED",
+      },
+      lastSyncedAt: {
+        type: Date,
+        default: null,
+      },
+      lastSyncError: {
+        type: String,
+        default: null,
+      },
+    },
+
+    viewsVerifiedAt: {
+      type: Date,
+      default: null,
+    },
+
+    rewardCreditedAt: {
+      type: Date,
+      default: null,
+    },
+
     feedback: {
       type: String,
       trim: true,

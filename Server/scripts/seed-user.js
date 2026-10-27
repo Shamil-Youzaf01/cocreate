@@ -1,23 +1,17 @@
-import { config } from "dotenv";
-config();
+import "dotenv/config";
+import crypto from "node:crypto";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import User from "../src/models/User.js";
-import { redisClient } from "../src/config/redis.js";
-import { storeVerificationToken } from "../src/services/emailVerification.service.js";
-import generateVerificationToken from "../src/utils/generateVerificationToken.js";
 
 const seedUser = async () => {
   await mongoose.connect(process.env.MONGODB_URI);
   console.log("MongoDB connected");
 
-  await redisClient.connect();
-  console.log("Redis connected");
-
   const { name, email, password, role } = {
     name: "Redis Creator",
     email: "rediscreator@test.com",
-    password: "password123",
+    password: crypto.randomBytes(32).toString("hex"),
     role: "CREATOR",
   };
 
@@ -38,18 +32,7 @@ const seedUser = async () => {
 
   console.log(`User created: ${user.email}`);
 
-  const { token, tokenHash } = generateVerificationToken();
-  await storeVerificationToken({
-    userId: user._id.toString(),
-    tokenHash,
-  });
-
-  console.log(`Verification token generated`);
-  console.log(
-    `Verification URL: ${process.env.CLIENT_URL}/verify-email?token=${token}`,
-  );
-
-  await redisClient.disconnect();
+  console.log(`Account is unverified. Use ${process.env.CLIENT_URL}/register to request a signup link and choose a password.`);
   await mongoose.disconnect();
   console.log("Disconnected");
   process.exit(0);

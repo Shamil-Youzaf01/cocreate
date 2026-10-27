@@ -1,9 +1,12 @@
+import { notifyUser } from "./notification.service.js";
 import Submission from "../models/Submission.js";
 import Application from "../models/Application.js";
 import Campaign from "../models/Campaign.js";
 import AppError from "../utils/AppError.js";
-import { creditCampaignReward } from "./wallet.service.js";
 import mongoose from "mongoose";
+import withSubmissionCredits from "../utils/withSubmissionCredits.js";
+import extractYouTubeVideoId from "../utils/extractYouTubeVideoId.js";
+import { captureYouTubeBaseline } from "./youtubeTracking.service.js";
 
 const createSubmission = async ({
   campaignId,
@@ -45,13 +48,32 @@ const createSubmission = async ({
     );
   }
 
-  return Submission.create({
+  let platformTracking = {
+    platform: null,
+    externalMediaId: null,
+    baselineViews: 0,
+    currentViews: 0,
+    eligibleViews: 0,
+    source: "MANUAL",
+    syncStatus: "NOT_CONNECTED",
+    lastSyncedAt: null,
+    lastSyncError: null,
+  };
+
+  if (campaign.platform === "YOUTUBE") {
+    platformTracking = await captureYouTubeBaseline(contentUrl);
+  }
+
+  const submission = await Submission.create({
     campaignId,
     creatorId,
     applicationId: application._id,
     contentUrl,
     caption,
+    platformTracking,
   });
+  await notifyUser({ recipientId: campaign.brandId, eventKey: `submission:${submission._id}:created`, type: "SUBMISSION", title: "New content to review", message: `A creator submitted content for ${campaign.title}.`, href: `/dashboard/submissions/campaign/${campaign._id}` });
+  return submission;
 };
 
 const getCampaignSubmissions = async ({ campaignId, brandId }) => {
@@ -65,9 +87,10 @@ const getCampaignSubmissions = async ({ campaignId, brandId }) => {
     throw new AppError("You are not authorized to view these submissions", 403);
   }
 
-  return Submission.find({ campaignId })
+  const submissions = await Submission.find({ campaignId })
     .populate("creatorId", "name email")
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1, _id: -1 });
+  return withSubmissionCredits(submissions);
 };
 
 const reviewSubmission = async ({
@@ -125,22 +148,16 @@ const reviewSubmission = async ({
       submission.feedback = feedback?.trim() || null;
       submission.reviewedAt = new Date();
 
-      await submission.save({ session });
-
-      // Money is created only when approved
       if (decision === "APPROVED") {
-        await creditCampaignReward({
-          creatorId: submission.creatorId,
-          campaignId: campaign._id,
-          submissionId: submission._id,
-          amount: campaign.reward,
-          session,
-        });
+        submission.rewardStatus = "PENDING_VERIFICATION";
       }
+
+      await submission.save({ session });
 
       updatedSubmission = submission;
     });
 
+    await notifyUser({ recipientId: updatedSubmission.creatorId, eventKey: `submission:${updatedSubmission._id}:${decision}:${updatedSubmission.reviewedAt.toISOString()}`, type: "SUBMISSION", title: decision === "APPROVED" ? "Content approved" : decision === "REVISION_REQUESTED" ? "Revision requested" : "Content rejected", message: feedback?.trim() || "Your submission review has been updated.", href: `/dashboard/submissions/${updatedSubmission._id}` });
     return updatedSubmission;
   } finally {
     await session.endSession();
@@ -167,6 +184,21 @@ const resubmitContent = async ({
     throw new AppError("This submission is not awaiting revision", 400);
   }
 
+  const campaign = await Campaign.findById(submission.campaignId);
+  if (!campaign) throw new AppError("Campaign not found", 404);
+  if (campaign.platform === "YOUTUBE") {
+    const videoId = extractYouTubeVideoId(contentUrl);
+    if (!videoId) throw new AppError("Please submit a valid YouTube video URL", 400);
+    if (videoId !== submission.platformTracking?.externalMediaId || submission.platformTracking?.source !== "YOUTUBE_API") {
+      submission.platformTracking = await captureYouTubeBaseline(contentUrl);
+      submission.verifiedViews = 0;
+      submission.calculatedReward = 0;
+      submission.finalReward = 0;
+      submission.viewsVerifiedAt = null;
+      submission.rewardStatus = "PENDING_VERIFICATION";
+    }
+  }
+
   submission.contentUrl = contentUrl;
 
   if (caption !== undefined) {
@@ -182,6 +214,7 @@ const resubmitContent = async ({
 
   await submission.save();
 
+  await notifyUser({ recipientId: campaign.brandId, eventKey: `submission:${submission._id}:resubmitted:${submission.submittedAt.toISOString()}`, type: "SUBMISSION", title: "Revised content submitted", message: `Updated content for ${campaign.title} is ready for review.`, href: `/dashboard/submissions/campaign/${campaign._id}` });
   return submission;
 };
 

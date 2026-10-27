@@ -1,0 +1,24 @@
+.logo {
+  display: inline-block;
+  width: 160px;
+  max-width: 100%;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.icon {
+  width: 32px;
+}
+.image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.inverted {
+  display: none;
+}
+:global([data-theme="dark"]) .standard {
+  display: none;
+}
+:global([data-theme="dark"]) .inverted {
+  display: block;
+}

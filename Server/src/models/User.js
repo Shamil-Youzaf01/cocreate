@@ -51,6 +51,54 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    // Shared profile fields
+    avatarUrl: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    bio: {
+      type: String,
+      trim: true,
+      maxlength: [300, "Bio cannot exceed 300 characters"],
+      default: "",
+    },
+    location: {
+      type: String,
+      trim: true,
+      maxlength: [100, "Location cannot exceed 100 characters"],
+      default: "",
+    },
+    instagramUrl: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    // Creator-specific profile fields
+    youtubeUrl: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    categories: {
+      type: [String],
+      default: [],
+    },
+
+    // Brand-specific profile fields
+    industry: {
+      type: String,
+      trim: true,
+      maxlength: [100, "Industry cannot exceed 100 characters"],
+      default: "",
+    },
+    website: {
+      type: String,
+      trim: true,
+      default: "",
+    },
   },
   {
     timestamps: true,

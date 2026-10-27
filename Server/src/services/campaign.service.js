@@ -1,5 +1,10 @@
+import { notifyAdmins, notifyCampaignClosed } from "./notification.service.js";
 import Campaign from "../models/Campaign.js";
+import Application from "../models/Application.js";
+import Submission from "../models/Submission.js";
 import AppError from "../utils/AppError.js";
+import getCampaignBudgetUsage from "../utils/getCampaignBudgetUsage.js";
+import buildBudgetSummary from "../utils/buildBudgetSummary.js";
 import {
   getPagination,
   getSort,
@@ -7,33 +12,58 @@ import {
   buildPaginationResponse,
 } from "../utils/query.js";
 
+function validateCampaignFormat(platform, contentType) {
+  const valid = platform === "INSTAGRAM"
+    ? contentType === "REEL"
+    : platform === "YOUTUBE" && ["VIDEO", "SHORT"].includes(contentType);
+  if (!valid) {
+    throw new AppError("Instagram campaigns require Reels. YouTube campaigns require Video or Shorts.", 400);
+  }
+}
+
 const createCampaign = async ({
   brandId,
   title,
+  coverImage,
   description,
   requirements,
   platform,
   contentType,
-  reward,
-  maxCreators,
+  campaignBudget,
+  rewardRatePerThousandViews,
+  minimumPayout,
+  maximumPayoutPerCreator,
+  creatorSlots,
   deadline,
 }) => {
+  validateCampaignFormat(platform, contentType);
   return Campaign.create({
     brandId,
     title,
+    coverImage: coverImage || { url: "", publicId: "" },
     description,
     requirements,
     platform,
     contentType,
-    reward,
-    maxCreators,
+    campaignBudget,
+    rewardRatePerThousandViews,
+    minimumPayout,
+    maximumPayoutPerCreator,
+    creatorSlots: creatorSlots || null,
     deadline,
+    status: "DRAFT",
   });
 };
 
 // BRAND: get their own campaigns
+const withBudget = async (campaign) => ({
+  ...campaign.toObject(),
+  ...buildBudgetSummary({ campaignBudget: campaign.campaignBudget, rewardsIssued: await getCampaignBudgetUsage(campaign._id) }),
+});
+
 const getBrandCampaigns = async (brandId) => {
-  return Campaign.find({ brandId }).sort({ createdAt: -1 });
+  const campaigns = await Campaign.find({ brandId }).sort({ createdAt: -1 });
+  return Promise.all(campaigns.map(withBudget));
 };
 
 // Public/Creator: only published campaigns
@@ -94,6 +124,7 @@ const getPublishedCampaigns = async ({
 
   const [campaigns, total] = await Promise.all([
     Campaign.find(filter)
+      .populate("brandId", "name")
       .sort(sortOption)
       .skip(pagination.skip)
       .limit(pagination.limit),
@@ -102,7 +133,7 @@ const getPublishedCampaigns = async ({
   ]);
 
   return {
-    campaigns,
+    campaigns: await Promise.all(campaigns.map(withBudget)),
     pagination: buildPaginationResponse({
       page: pagination.page,
       limit: pagination.limit,
@@ -112,7 +143,10 @@ const getPublishedCampaigns = async ({
 };
 
 // Get one campaign
-const getCampaignById = async (campaignId) => {
+const getCampaignById = async (campaignId, user) => {
+  if (!user?.userId || !["BRAND", "CREATOR", "ADMIN"].includes(user.role)) {
+    throw new AppError("Authentication required", 401);
+  }
   const campaign = await Campaign.findById(campaignId).populate(
     "brandId",
     "name",
@@ -122,7 +156,22 @@ const getCampaignById = async (campaignId) => {
     throw new AppError("Campaign not found", 404);
   }
 
-  return campaign;
+  const isOwner = user.role === "BRAND" &&
+    String(campaign.brandId?._id ?? campaign.brandId) === user.userId;
+  let visible = user.role === "ADMIN" || isOwner || campaign.status === "PUBLISHED";
+  if (!visible && user.role === "CREATOR" && ["CLOSED", "COMPLETED"].includes(campaign.status)) {
+    const participant = { campaignId: campaign._id, creatorId: user.userId };
+    const [acceptedApplication, submission] = await Promise.all([
+      Application.exists({ ...participant, status: "ACCEPTED" }),
+      Submission.exists(participant),
+    ]);
+    visible = Boolean(acceptedApplication || submission);
+  }
+  if (!visible) {
+    throw new AppError("Campaign not found", 404);
+  }
+
+  return withBudget(campaign);
 };
 
 // BRAND: edit own DRAFT
@@ -143,14 +192,22 @@ const updateCampaign = async ({ campaignId, brandId, updates }) => {
 
   const allowedFields = [
     "title",
+    "coverImage",
     "description",
     "requirements",
     "platform",
     "contentType",
-    "reward",
-    "maxCreators",
+    "campaignBudget",
+    "rewardRatePerThousandViews",
+    "minimumPayout",
+    "maximumPayoutPerCreator",
+    "creatorSlots",
     "deadline",
   ];
+
+  if (updates.platform !== undefined || updates.contentType !== undefined) {
+    validateCampaignFormat(updates.platform ?? campaign.platform, updates.contentType ?? campaign.contentType);
+  }
 
   allowedFields.forEach((field) => {
     if (updates[field] !== undefined) {
@@ -190,6 +247,7 @@ const publishCampaign = async ({ campaignId, brandId }) => {
 
   await campaign.save();
 
+  await notifyAdmins({ eventKey: `campaign:${campaign._id}:published`, type: "CAMPAIGN", title: "Campaign published", message: `${campaign.title} is now available to creators.`, href: `/dashboard/campaigns/${campaign._id}` });
   return campaign;
 };
 
@@ -213,6 +271,7 @@ const closeCampaign = async ({ campaignId, brandId }) => {
 
   await campaign.save();
 
+  await notifyCampaignClosed(campaign);
   return campaign;
 };
 

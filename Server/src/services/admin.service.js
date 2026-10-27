@@ -1,3 +1,4 @@
+import { notifyCampaignClosed } from "./notification.service.js";
 import User from "../models/User.js";
 import Campaign from "../models/Campaign.js";
 import AppError from "../utils/AppError.js";
@@ -15,10 +16,10 @@ const getUsers = async ({ role, status, search, page, limit, sort }) => {
     limit,
   });
 
-  const filter = {};
+  const filter = { role: { $in: ["CREATOR", "BRAND"] } };
 
   if (role) {
-    const allowedRoles = ["CREATOR", "BRAND", "ADMIN"];
+    const allowedRoles = ["CREATOR", "BRAND"];
 
     if (!allowedRoles.includes(role)) {
       throw new AppError("Invalid user role", 400);
@@ -119,6 +120,7 @@ const moderateCampaign = async ({ campaignId, action }) => {
 
   await campaign.save();
 
+  await notifyCampaignClosed(campaign, true);
   return campaign;
 };
 

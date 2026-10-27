@@ -1,3 +1,5 @@
+import Campaign from "../models/Campaign.js";
+import { getPagination, buildSearchFilter, buildPaginationResponse } from "../utils/query.js";
 import AppError from "../utils/AppError.js";
 
 import {
@@ -66,3 +68,18 @@ const moderateCampaignStatus = async (req, res) => {
 };
 
 export { listUsers, changeUserStatus, moderateCampaignStatus };
+
+export const getAdminCampaigns = async (req, res, next) => {
+  try {
+    const { status, search } = req.query;
+    if (status && !["DRAFT", "PUBLISHED", "CLOSED", "COMPLETED"].includes(status)) throw new AppError("Invalid campaign status", 400);
+    if (search !== undefined && typeof search !== "string") throw new AppError("Invalid search", 400);
+    const pagination = getPagination({ ...req.query, limit: req.query.limit || 20 });
+    const filter = { ...buildSearchFilter(search, ["title"]), ...(status ? { status } : {}) };
+    const [campaigns, total] = await Promise.all([
+      Campaign.find(filter).populate("brandId", "name email status").sort({ createdAt: -1, _id: -1 }).skip(pagination.skip).limit(pagination.limit).lean(),
+      Campaign.countDocuments(filter),
+    ]);
+    return res.status(200).json({ success: true, data: { campaigns, pagination: buildPaginationResponse({ ...pagination, total }) } });
+  } catch (error) { next(error); }
+};

@@ -4,6 +4,9 @@ const emailTransporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT),
   secure: Number(process.env.SMTP_PORT) === 465,
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 20000,
   logger: process.env.NODE_ENV === "development",
 
   auth: {

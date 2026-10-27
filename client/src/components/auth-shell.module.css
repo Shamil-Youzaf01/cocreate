@@ -1,0 +1,204 @@
+.page {
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-input-label-text-color: var(--input-label-text-color);
+  --color-input-placeholder-text-color: var(--input-placeholder-text-color);
+  --color-input-border: var(--input-border);
+  --color-input-background: var(--input-background);
+  --color-card-background: var(--card-background);
+  --color-background-white-primary: var(--background-white-primary);
+  --color-background-gray-secondary: var(--background-gray-secondary);
+  --color-icon-tertiary: var(--icon-tertiary);
+  --color-border-secondary-alt: var(--border-secondary-alt);
+  --brand-400: #a996ff;
+  --brand-500: #6c4cff;
+  --brand-600: #5635e0;
+  --text-primary: #101011;
+  --text-secondary: #54534f;
+  --text-tertiary: #72706a;
+  --input-label-text-color: #18181a;
+  --input-placeholder-text-color: #72706a;
+  --input-border: #d9d7cf;
+  --input-background: rgba(252, 252, 248, 0.62);
+  --card-background: #f2f1eb;
+  --background-white-primary: rgba(252, 252, 248, 0.52);
+  --background-gray-secondary: rgba(169, 150, 255, 0.12);
+  --icon-tertiary: #72706a;
+  --border-secondary-alt: #d9d7cf;
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 28px 16px;
+  isolation: isolate;
+  position: relative;
+  overflow: hidden;
+  color: #101011;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f2f1eb;
+}
+.page::before,
+.page::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  z-index: -1;
+  width: min(65vw, 720px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  filter: blur(55px);
+}
+.page::before {
+  top: -22%;
+  left: -15%;
+  background: radial-gradient(
+    circle,
+    #a996ff99,
+    #6c4cff22 55%,
+    transparent 70%
+  );
+}
+.page::after {
+  bottom: -28%;
+  right: -12%;
+  background: radial-gradient(
+    circle,
+    #d8ff6399,
+    #ff795b26 55%,
+    transparent 70%
+  );
+}
+.card {
+  width: 100%;
+  max-width: 820px;
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 24px;
+  background: rgba(252, 252, 248, 0.55);
+  backdrop-filter: blur(28px) saturate(135%);
+  -webkit-backdrop-filter: blur(28px) saturate(135%);
+  box-shadow:
+    0 24px 80px #10101112,
+    inset 0 1px 0 #ffffff;
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 14px 24px;
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.back {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  border: 1px solid #d9d7cf;
+  background: #fcfcf866;
+}
+.back:hover {
+  background: #fcfcf8;
+}
+.back:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.content {
+  width: 100%;
+  max-width: 360px;
+  margin: auto;
+  padding: 12px 0 4px;
+}
+.story {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 24px 26px;
+  border-left: 1px solid #ffffff66;
+  background: linear-gradient(145deg, #6c4cffe8, #573bd1c9);
+  color: #fcfcf8;
+}
+.eyebrow {
+  margin-top: 24px;
+  color: #d8ff63;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.story h2 {
+  margin-top: 14px;
+  font-size: clamp(23px, 2.6vw, 28px);
+  font-weight: 700;
+  line-height: 1.13;
+  letter-spacing: -0.04em;
+}
+.description {
+  margin-top: 16px;
+  font-size: 12px;
+  line-height: 1.65;
+  color: #ffffffd9;
+}
+.badge {
+  margin-top: 16px;
+  align-self: flex-start;
+  padding: 9px 14px;
+  border: 1px solid #ffffff4d;
+  border-radius: 999px;
+  background: #ffffff12;
+  font-size: 11px;
+}
+.page a:focus-visible,
+.page button:focus-visible {
+  outline: 2px solid #6c4cff;
+  outline-offset: 4px;
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .card {
+    background: #fcfcf8ed;
+  }
+}
+@media (max-width: 767px) {
+  .page {
+    padding: 24px 14px;
+  }
+  .card {
+    max-width: 440px;
+    grid-template-columns: 1fr;
+    border-radius: 24px;
+  }
+  .form {
+    padding: 14px 18px;
+  }
+  .story {
+    display: none;
+  }
+}
+
+/* Compact shared heading scale; keep form text readable. */
+.content h1 {
+  font-size: 23px;
+  line-height: 1.25;
+}
+
+/* Smaller typography across the shared authentication forms. */
+.content :global(.text-sm) {
+  font-size: 13px;
+  line-height: 1.45;
+}
+.content :global(.text-xs) {
+  font-size: 11px;
+  line-height: 1.45;
+}

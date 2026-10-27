@@ -1,3 +1,4 @@
+import { notifyUser, notifyAdmins } from "./notification.service.js";
 import Report from "../models/Report.js";
 import User from "../models/User.js";
 import Campaign from "../models/Campaign.js";
@@ -63,13 +64,15 @@ const createReport = async ({
     );
   }
 
-  return Report.create({
+  const report = await Report.create({
     reporterId,
     targetType,
     targetId,
     reason,
     description,
   });
+  await notifyAdmins({ eventKey: `report:${report._id}:created`, type: "REPORT", title: "New report received", message: "A new report is waiting for admin review.", href: "/dashboard/reports" });
+  return report;
 };
 
 const getUserReports = async (reporterId) => {
@@ -134,6 +137,7 @@ const updateReportStatus = async ({ reportId, adminId, status, adminNote }) => {
   report.reviewedAt = new Date();
 
   await report.save();
+  await notifyUser({ recipientId: report.reporterId, eventKey: `report:${report._id}:${report.status}`, type: "REPORT", title: "Report status updated", message: `Your report is now ${report.status.toLowerCase().replaceAll("_", " ")}.`, href: "/dashboard/reports" });
 
   return report;
 };

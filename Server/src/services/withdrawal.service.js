@@ -1,3 +1,4 @@
+import { notifyUser, notifyAdmins } from "./notification.service.js";
 import mongoose from "mongoose";
 
 import Withdrawal from "../models/Withdrawal.js";
@@ -73,6 +74,7 @@ const requestWithdrawal = async ({ creatorId, amount, paymentDetails }) => {
       withdrawal = withdrawals[0];
     });
 
+    await notifyAdmins({ eventKey: `withdrawal:${withdrawal._id}:requested`, type: "WITHDRAWAL", title: "New withdrawal request", message: "A creator has requested a payout. Review the amount and payment details.", href: "/dashboard/withdrawals" });
     return withdrawal;
   } finally {
     await session.endSession();
@@ -104,22 +106,28 @@ const getAllWithdrawals = async ({ status }) => {
 };
 
 const approveWithdrawal = async ({ withdrawalId, adminNote }) => {
-  const withdrawal = await Withdrawal.findById(withdrawalId);
+  // Match the current state in the write so a stale approval cannot overwrite
+  // a rejection that has already returned the reserved funds.
+  const withdrawal = await Withdrawal.findOneAndUpdate(
+    { _id: withdrawalId, status: "PENDING" },
+    {
+      $set: {
+        status: "APPROVED",
+        adminNote: adminNote || null,
+        reviewedAt: new Date(),
+      },
+    },
+    { new: true, runValidators: true },
+  );
 
   if (!withdrawal) {
-    throw new AppError("Withdrawal request not found", 404);
+    if (!(await Withdrawal.exists({ _id: withdrawalId }))) {
+      throw new AppError("Withdrawal request not found", 404);
+    }
+    throw new AppError("Only pending withdrawals can be approved", 409);
   }
 
-  if (withdrawal.status !== "PENDING") {
-    throw new AppError("Only pending withdrawals can be approved", 400);
-  }
-
-  withdrawal.status = "APPROVED";
-  withdrawal.adminNote = adminNote || null;
-  withdrawal.reviewedAt = new Date();
-
-  await withdrawal.save();
-
+  await notifyUser({ recipientId: withdrawal.creatorId, eventKey: `withdrawal:${withdrawal._id}:approved`, type: "WITHDRAWAL", title: "Withdrawal approved", message: "Your withdrawal has been approved and is awaiting payment.", href: "/dashboard/withdrawals" });
   return withdrawal;
 };
 
@@ -163,6 +171,7 @@ const rejectWithdrawal = async ({ withdrawalId, adminNote }) => {
       updatedWithdrawal = withdrawal;
     });
 
+    await notifyUser({ recipientId: updatedWithdrawal.creatorId, eventKey: `withdrawal:${updatedWithdrawal._id}:rejected`, type: "WITHDRAWAL", title: "Withdrawal rejected", message: "Your withdrawal was rejected. Reserved funds have been returned to your available balance.", href: "/dashboard/withdrawals" });
     return updatedWithdrawal;
   } finally {
     await session.endSession();
@@ -228,6 +237,7 @@ const markWithdrawalPaid = async ({ withdrawalId, adminNote }) => {
       updatedWithdrawal = withdrawal;
     });
 
+    await notifyUser({ recipientId: updatedWithdrawal.creatorId, eventKey: `withdrawal:${updatedWithdrawal._id}:paid`, type: "WITHDRAWAL", title: "Withdrawal paid", message: "Your payout has been marked as sent. Check your payment account for receipt.", href: "/dashboard/withdrawals" });
     return updatedWithdrawal;
   } finally {
     await session.endSession();

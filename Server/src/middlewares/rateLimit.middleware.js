@@ -26,19 +26,6 @@ const registerLimiter = rateLimit({
   },
 });
 
-const resendVerificationLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 10,
-
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-
-  message: {
-    success: false,
-    message: "Too many verification requests. Please try again later.",
-  },
-});
-
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 300,
@@ -52,4 +39,4 @@ const apiLimiter = rateLimit({
   },
 });
 
-export { loginLimiter, registerLimiter, resendVerificationLimiter, apiLimiter };
+export { loginLimiter, registerLimiter, apiLimiter };

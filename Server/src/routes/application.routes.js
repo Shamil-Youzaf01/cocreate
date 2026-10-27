@@ -1,3 +1,4 @@
+import { getBrandApplications } from "../controllers/application.controller.js";
 import express from "express";
 
 import {
@@ -11,6 +12,8 @@ import protect from "../middlewares/auth.middleware.js";
 import authorize from "../middlewares/authorize.middleware.js";
 
 const router = express.Router();
+
+router.get("/brand/my", protect, authorize("BRAND"), getBrandApplications);
 
 router.post(
   "/campaigns/:campaignId/apply",

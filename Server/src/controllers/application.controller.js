@@ -1,3 +1,5 @@
+import Application from "../models/Application.js";
+import Campaign from "../models/Campaign.js";
 import {
   applyToCampaign,
   getCreatorApplications,
@@ -65,3 +67,88 @@ const review = async (req, res) => {
 };
 
 export { apply, getMyApplications, getApplicationsForCampaign, review };
+
+const getBrandApplications = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const brandId = req.user.userId;
+
+    const campaigns =
+      await Campaign.find({
+        brandId,
+      })
+        .select(
+          "_id title rewardRatePerThousandViews minimumPayout maximumPayoutPerCreator campaignBudget creatorSlots deadline status"
+        )
+        .lean();
+
+    const campaignIds =
+      campaigns.map(
+        (campaign) =>
+          campaign._id
+      );
+
+    const applications =
+      await Application.find({
+        campaignId: {
+          $in: campaignIds,
+        },
+      })
+        .populate({
+          path: "creatorId",
+          select:
+            "name email",
+        })
+        .populate({
+          path: "campaignId",
+          select:
+            "title rewardRatePerThousandViews minimumPayout maximumPayoutPerCreator campaignBudget creatorSlots deadline status",
+        })
+        .sort({
+          createdAt: -1,
+        })
+        .lean();
+
+    const summary = {
+      total:
+        applications.length,
+
+      pending:
+        applications.filter(
+          (item) =>
+            item.status ===
+            "PENDING"
+        ).length,
+
+      accepted:
+        applications.filter(
+          (item) =>
+            item.status ===
+            "ACCEPTED"
+        ).length,
+
+      rejected:
+        applications.filter(
+          (item) =>
+            item.status ===
+            "REJECTED"
+        ).length,
+    };
+
+    return res.status(200).json({
+      success: true,
+
+      data: {
+        summary,
+        applications,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export { getBrandApplications };

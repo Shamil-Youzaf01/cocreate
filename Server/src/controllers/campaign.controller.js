@@ -8,16 +8,23 @@ import {
   publishCampaign,
   closeCampaign,
 } from "../services/campaign.service.js";
+import Application from "../models/Application.js";
+import Submission from "../models/Submission.js";
+import getCampaignRewardOverview from "../utils/getCampaignRewardOverview.js";
 
 const createCampaign = async (req, res) => {
   const {
     title,
+    coverImage,
     description,
     requirements,
     platform,
     contentType,
-    reward,
-    maxCreators,
+    campaignBudget,
+    rewardRatePerThousandViews,
+    minimumPayout,
+    maximumPayoutPerCreator,
+    creatorSlots,
     deadline,
   } = req.body;
 
@@ -27,8 +34,10 @@ const createCampaign = async (req, res) => {
     !requirements ||
     !platform ||
     !contentType ||
-    reward === undefined ||
-    !maxCreators ||
+    campaignBudget === undefined ||
+    rewardRatePerThousandViews === undefined ||
+    minimumPayout === undefined ||
+    maximumPayoutPerCreator === undefined ||
     !deadline
   ) {
     throw new AppError("All campaign fields are required", 400);
@@ -43,12 +52,16 @@ const createCampaign = async (req, res) => {
   const campaign = await createCampaignService({
     brandId: req.user.userId,
     title,
+    coverImage,
     description,
     requirements,
     platform,
     contentType,
-    reward,
-    maxCreators,
+    campaignBudget,
+    rewardRatePerThousandViews,
+    minimumPayout,
+    maximumPayoutPerCreator,
+    creatorSlots: creatorSlots || null,
     deadline: deadlineDate,
   });
 
@@ -94,12 +107,26 @@ const getPublished = async (req, res) => {
 };
 
 const getCampaign = async (req, res) => {
-  const campaign = await getCampaignById(req.params.campaignId);
+  const campaign = await getCampaignById(req.params.campaignId, req.user);
+  let myApplication = null;
+  let mySubmission = null;
+  if (req.user.role === "CREATOR") {
+    const filter = { campaignId: campaign._id, creatorId: req.user.userId };
+    [myApplication, mySubmission] = await Promise.all([
+      Application.findOne(filter).select("status").lean(),
+      Submission.findOne(filter).select("status").lean(),
+    ]);
+  }
+  if (req.user.role === "BRAND" && campaign.brandId?._id?.toString() === req.user.userId) {
+    campaign.rewardOverview = await getCampaignRewardOverview(campaign._id);
+  }
 
   res.status(200).json({
     success: true,
     data: {
       campaign,
+      myApplication,
+      mySubmission,
     },
   });
 };
@@ -160,7 +187,17 @@ const close = async (req, res) => {
   });
 };
 
+const uploadCampaignCover = async (req, res) => {
+  if (!req.file) throw new AppError("Campaign image is required.", 400);
+  res.status(200).json({
+    success: true,
+    message: "Campaign image uploaded successfully.",
+    data: { coverImage: { url: req.file.path, publicId: req.file.filename } },
+  });
+};
+
 export {
+  uploadCampaignCover,
   createCampaign,
   getMyCampaigns,
   getPublished,

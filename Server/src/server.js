@@ -5,10 +5,12 @@ import app from "./app.js";
 import connectDatabase from "./config/database.js";
 import { connectRedis, redisClient } from "./config/redis.js";
 import validateEnv from "./config/env.js";
+import { startYouTubeTracking } from "./jobs/youtubeTracking.js";
 
 const PORT = process.env.PORT || 5000;
 
 let server;
+let stopYouTubeTracking;
 
 const startServer = async () => {
   try {
@@ -16,6 +18,7 @@ const startServer = async () => {
 
     await connectDatabase();
     await connectRedis();
+    stopYouTubeTracking = startYouTubeTracking();
 
     server = app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
@@ -28,6 +31,7 @@ const startServer = async () => {
 };
 
 const shutdown = async (signal) => {
+  stopYouTubeTracking?.();
   console.log(`${signal} received. Shutting down gracefully...`);
 
   if (!server) {

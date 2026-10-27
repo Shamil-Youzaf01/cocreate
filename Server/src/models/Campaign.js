@@ -16,6 +16,19 @@ const campaignSchema = new mongoose.Schema(
       maxlength: 100,
     },
 
+    coverImage: {
+      url: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+      publicId: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+    },
+
     description: {
       type: String,
       required: [true, "Campaign description is required"],
@@ -42,16 +55,34 @@ const campaignSchema = new mongoose.Schema(
       required: true,
     },
 
-    reward: {
+    campaignBudget: {
       type: Number,
       required: true,
-      min: [0, "Reward cannot be negative"],
+      min: [1, "Campaign budget must be greater than 0"],
     },
 
-    maxCreators: {
+    rewardRatePerThousandViews: {
       type: Number,
       required: true,
-      min: [1, "At least one creator is required"],
+      min: [1, "Reward rate must be greater than 0"],
+    },
+
+    minimumPayout: {
+      type: Number,
+      required: true,
+      min: [0, "Minimum payout cannot be negative"],
+    },
+
+    maximumPayoutPerCreator: {
+      type: Number,
+      required: true,
+      min: [1, "Maximum payout must be greater than 0"],
+    },
+
+    creatorSlots: {
+      type: Number,
+      min: [1, "Creator slots must be at least 1"],
+      default: null,
     },
 
     deadline: {
@@ -69,6 +100,16 @@ const campaignSchema = new mongoose.Schema(
     timestamps: true,
   },
 );
+
+campaignSchema.pre("validate", function () {
+  if (this.minimumPayout > this.maximumPayoutPerCreator) {
+    throw new Error("Minimum payout cannot exceed maximum payout per creator.");
+  }
+
+  if (this.maximumPayoutPerCreator > this.campaignBudget) {
+    throw new Error("Maximum payout per creator cannot exceed campaign budget.");
+  }
+});
 
 campaignSchema.index({
   brandId: 1,

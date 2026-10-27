@@ -2,6 +2,11 @@ const errorHandler = (err, req, res, next) => {
   let statusCode = err.statusCode || 500;
   let message = err.message || "Internal server error";
 
+  if (err.name === "MulterError") {
+    statusCode = err.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+    message = err.code === "LIMIT_FILE_SIZE" ? "Campaign image must be 5 MB or smaller." : "Upload one campaign image using the cover field.";
+  }
+
   if (err.name === "CastError") {
     statusCode = 400;
     message = `Invalid ${err.path}`;
